@@ -1,0 +1,15 @@
+# Core
+python-dotenv
+pandas
+numpy
+requests
+
+# Azure OpenAI
+openai>=1.0.0
+
+# Dashboard
+streamlit
+
+# Optional (only if you want plotting like in some agent prototypes)
+plotly
+matplotlib
