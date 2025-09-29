@@ -13,3 +13,4 @@ streamlit
 # Optional (only if you want plotting like in some agent prototypes)
 plotly
 matplotlib
+scikit-learn
