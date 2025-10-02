@@ -59,34 +59,45 @@ def render_output(tab_name, output):
             else:
                 return [''] * len(row)
 
-        styled_df = df.style.apply(color_row, axis=1)
-        st.dataframe(styled_df, use_container_width=True)
+        # Use st.table for styles to actually render
+        st.table(df.style.apply(color_row, axis=1))
 
-    # Dict outputs → table + chart
+    # Grid Faults → Table only, no charts
+    elif tab_name == "Grid Faults":
+        if isinstance(output, dict):
+            df = pd.DataFrame(list(output.items()), columns=["Metric", "Value"])
+            st.table(df)
+        elif isinstance(output, list) and all(isinstance(i, dict) for i in output):
+            df = pd.DataFrame(output)
+            st.table(df)
+        else:
+            st.write(output)
+
+    # Other tabs → Try safe table, only chart if clearly numeric
     elif isinstance(output, dict):
         df = pd.DataFrame(list(output.items()), columns=["Metric", "Value"])
         st.table(df)
 
+        # Only chart if values are numeric
         numeric_df = df[pd.to_numeric(df["Value"], errors="coerce").notnull()]
         if not numeric_df.empty:
             st.bar_chart(numeric_df.set_index("Metric"))
 
-    # List of dicts → dataframe + optional line chart
     elif isinstance(output, list) and all(isinstance(i, dict) for i in output):
         df = pd.DataFrame(output)
-        st.dataframe(df, use_container_width=True)
+        st.table(df)  # safer than dataframe for mixed content
 
+        # Chart only if there is a proper time/date column
         time_cols = [c for c in df.columns if "time" in c.lower() or "date" in c.lower()]
         if time_cols:
             try:
                 st.line_chart(df.set_index(time_cols[0]))
             except Exception:
                 pass
-
     else:
         st.write(output)
 
-    # Add GenAI Recommendation below the table/chart
+    # Add GenAI Recommendation
     st.markdown("### 🤖 GenAI Recommendation")
     recommendation = get_genai_recommendation(tab_name, output)
     st.write(recommendation)
