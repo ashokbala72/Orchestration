@@ -53,21 +53,28 @@ if st.sidebar.button("▶ Run Orchestrator"):
     orch = OrchestratorAgent()
     results = orch.run()
 
-    tab_labels = [
-        "Asset Integrity",
-        "Grid Faults",
-        "Demand Forecast",
-        "Renewable Integration",
-        "Utility Energy Management",
-        "Supply Chain Optimization",
-        "Field Operations",
-        "Energy Trading"
-    ]
-    tabs = st.tabs(tab_labels)
+    # Explicit mapping of tabs to agent keys
+    tab_mapping = {
+        "Asset Integrity": "asset_integrity",
+        "Grid Faults": "grid_faults",
+        "Demand Forecast": "demand_forecast",
+        "Renewable Integration": "renewable_integration",
+        "Utility Energy Management": "utility_energy_management",
+        "Supply Chain Optimization": "supply_chain_optimization",
+        "Field Operations": "field_operations",
+        "Energy Trading": "energy_trading"
+    }
 
-    for idx, (agent_name, output) in enumerate(results.items()):
+    tabs = st.tabs(list(tab_mapping.keys()))
+
+    for idx, (label, agent_key) in enumerate(tab_mapping.items()):
         with tabs[idx]:
-            st.subheader(f"{tab_labels[idx]} Results")
+            st.subheader(f"{label} Results")
+
+            output = results.get(agent_key, {})
+            if not output:
+                st.warning("⚠️ No data returned from this agent.")
+                continue
 
             # Convert JSON to DataFrame if possible
             try:
@@ -93,10 +100,7 @@ if st.sidebar.button("▶ Run Orchestrator"):
             except Exception:
                 safe_output = pprint.pformat(output, indent=2)
 
-            prompt = (
-                f"Summarize insights and give a recommendation for the following "
-                f"{tab_labels[idx]} results:\n{safe_output}"
-            )
+            prompt = f"Summarize insights and give a recommendation for the following {label} results:\n{safe_output}"
             with st.spinner("Generating GenAI recommendation..."):
                 advisory = genai_advisory(prompt)
                 st.markdown("### 🤖 GenAI Recommendation")
