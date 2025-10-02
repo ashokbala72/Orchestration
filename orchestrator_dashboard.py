@@ -45,57 +45,34 @@ def get_genai_recommendation(tab_name, output):
 
 # ---------- Helper: Output Renderer ----------
 def render_output(tab_name, output):
-    # Asset Integrity with RAG backgrounds
+    # Asset Integrity with RAG backgrounds (scrollable table)
     if tab_name == "Asset Integrity" and isinstance(output, list):
         df = pd.DataFrame(output)
 
         def color_row(row):
-            if "Immediate" in str(row.get("status", "")):
-                return ['background-color: red'] * len(row)
-            elif "Medium" in str(row.get("status", "")):
-                return ['background-color: orange'] * len(row)
-            elif "Long" in str(row.get("status", "")):
-                return ['background-color: lightgreen'] * len(row)
-            else:
-                return [''] * len(row)
+            if "RUL (months)" in row:
+                if row["RUL (months)"] <= 3:
+                    return ['background-color: red'] * len(row)
+                elif row["RUL (months)"] <= 6:
+                    return ['background-color: yellow'] * len(row)
+                else:
+                    return ['background-color: lightgreen'] * len(row)
+            return [''] * len(row)
 
-        # Use st.table for styles to actually render
-        st.table(df.style.apply(color_row, axis=1))
+        st.markdown("**🟩 Green = Safe | 🟨 Yellow = Nearing Replacement | 🟥 Red = Immediate Replacement Required**")
+        styled_df = df.style.apply(color_row, axis=1)
+        st.dataframe(styled_df, use_container_width=True, height=500)  # scrollable
 
-    # Grid Faults → Table only, no charts
-    elif tab_name == "Grid Faults":
+    # All other tabs → just display a clean scrollable table
+    else:
         if isinstance(output, dict):
             df = pd.DataFrame(list(output.items()), columns=["Metric", "Value"])
-            st.table(df)
+            st.dataframe(df, use_container_width=True, height=500)
         elif isinstance(output, list) and all(isinstance(i, dict) for i in output):
             df = pd.DataFrame(output)
-            st.table(df)
+            st.dataframe(df, use_container_width=True, height=500)
         else:
             st.write(output)
-
-    # Other tabs → Try safe table, only chart if clearly numeric
-    elif isinstance(output, dict):
-        df = pd.DataFrame(list(output.items()), columns=["Metric", "Value"])
-        st.table(df)
-
-        # Only chart if values are numeric
-        numeric_df = df[pd.to_numeric(df["Value"], errors="coerce").notnull()]
-        if not numeric_df.empty:
-            st.bar_chart(numeric_df.set_index("Metric"))
-
-    elif isinstance(output, list) and all(isinstance(i, dict) for i in output):
-        df = pd.DataFrame(output)
-        st.table(df)  # safer than dataframe for mixed content
-
-        # Chart only if there is a proper time/date column
-        time_cols = [c for c in df.columns if "time" in c.lower() or "date" in c.lower()]
-        if time_cols:
-            try:
-                st.line_chart(df.set_index(time_cols[0]))
-            except Exception:
-                pass
-    else:
-        st.write(output)
 
     # Add GenAI Recommendation
     st.markdown("### 🤖 GenAI Recommendation")
