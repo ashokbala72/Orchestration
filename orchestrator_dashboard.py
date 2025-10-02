@@ -32,7 +32,7 @@ def genai_advisory(prompt: str):
         return f"⚠️ GenAI Error: {e}"
 
 # ----------------------
-# Table Coloring Logic
+# Table Coloring Logic (RUL-driven)
 # ----------------------
 def color_rag(row):
     if "RUL (months)" in row:
@@ -53,7 +53,7 @@ if st.sidebar.button("▶ Run Orchestrator"):
     orch = OrchestratorAgent()
     results = orch.run()
 
-    # Correct mapping to orchestrator.py keys
+    # Explicit mapping to orchestrator keys
     tab_mapping = {
         "Asset Integrity": "AssetIntegrity",
         "Grid Faults": "GridFaults",
@@ -76,25 +76,66 @@ if st.sidebar.button("▶ Run Orchestrator"):
                 st.warning("⚠️ No data returned from this agent.")
                 continue
 
-            # Convert JSON to DataFrame if possible
-            try:
-                if isinstance(output, dict):
-                    df = pd.json_normalize(output)
-                elif isinstance(output, list):
-                    df = pd.DataFrame(output)
-                else:
-                    df = pd.DataFrame([{"Result": str(output)}])
+            df = None
 
-                # Apply RAG coloring only if RUL present
-                if "RUL (months)" in df.columns:
-                    styled_df = df.style.apply(color_rag, axis=1)
-                    st.dataframe(styled_df, use_container_width=True, height=300)
-                else:
+            # --- Custom handling per agent ---
+            if label == "Asset Integrity":
+                df = pd.DataFrame(output) if isinstance(output, list) else pd.json_normalize(output)
+                styled_df = df.style.apply(color_rag, axis=1)
+                st.dataframe(styled_df, use_container_width=True, height=300)
+
+            elif label == "Grid Faults":
+                df = pd.DataFrame(output) if isinstance(output, list) else pd.json_normalize(output)
+                st.dataframe(df, use_container_width=True, height=300)
+
+            elif label == "Demand Forecast":
+                if isinstance(output, dict) and "forecast" in output:
+                    df = pd.DataFrame(output["forecast"])
                     st.dataframe(df, use_container_width=True, height=300)
-            except Exception:
-                st.json(output)
+                    if "summary" in output:
+                        st.markdown(f"**Agent Summary:** {output['summary']}")
+                else:
+                    st.json(output)
 
-            # GenAI Recommendation (safe serialization)
+            elif label == "Renewable Integration":
+                if isinstance(output, dict) and "integration_plan" in output:
+                    df = pd.DataFrame(output["integration_plan"])
+                    st.dataframe(df, use_container_width=True, height=300)
+                else:
+                    st.json(output)
+
+            elif label == "Utility Energy Management":
+                if isinstance(output, dict) and "dispatch_plan" in output:
+                    df = pd.DataFrame(output["dispatch_plan"])
+                    st.dataframe(df, use_container_width=True, height=300)
+                else:
+                    st.json(output)
+
+            elif label == "Supply Chain Optimization":
+                if isinstance(output, dict) and "parts_forecast" in output:
+                    df = pd.DataFrame(output["parts_forecast"])
+                    st.dataframe(df, use_container_width=True, height=300)
+                else:
+                    st.json(output)
+
+            elif label == "Field Operations":
+                if isinstance(output, dict) and "work_orders" in output:
+                    df = pd.DataFrame(output["work_orders"])
+                    st.dataframe(df, use_container_width=True, height=300)
+                else:
+                    st.json(output)
+
+            elif label == "Energy Trading":
+                if isinstance(output, dict):
+                    if "market_position" in output:
+                        st.json(output["market_position"])
+                    if "buy_sell_orders" in output:
+                        df = pd.DataFrame(output["buy_sell_orders"])
+                        st.dataframe(df, use_container_width=True, height=300)
+                else:
+                    st.json(output)
+
+            # --- GenAI Recommendation ---
             try:
                 safe_output = json.dumps(output, indent=2, default=str)
             except Exception:
