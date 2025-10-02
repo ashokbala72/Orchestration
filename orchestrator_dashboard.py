@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import os
+import pprint
 from orchestrator import OrchestratorAgent
 from dotenv import load_dotenv
 from openai import AzureOpenAI
@@ -86,8 +87,16 @@ if st.sidebar.button("▶ Run Orchestrator"):
             except Exception:
                 st.json(output)
 
-            # GenAI Recommendation
-            prompt = f"Summarize insights and give a recommendation for the following {tab_labels[idx]} results:\n{json.dumps(output, indent=2)}"
+            # GenAI Recommendation (safe serialization)
+            try:
+                safe_output = json.dumps(output, indent=2, default=str)
+            except Exception:
+                safe_output = pprint.pformat(output, indent=2)
+
+            prompt = (
+                f"Summarize insights and give a recommendation for the following "
+                f"{tab_labels[idx]} results:\n{safe_output}"
+            )
             with st.spinner("Generating GenAI recommendation..."):
                 advisory = genai_advisory(prompt)
                 st.markdown("### 🤖 GenAI Recommendation")
