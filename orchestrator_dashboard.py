@@ -3,96 +3,95 @@ import pandas as pd
 import json
 import os
 from orchestrator import OrchestratorAgent
+from dotenv import load_dotenv
 from openai import AzureOpenAI
 
-st.set_page_config(page_title="Utility Orchestrator", layout="wide")
-st.title("⚡ Utility Orchestrator – Multi-Agent Results")
-st.sidebar.header("Controls")
-
+# ----------------------
+# Azure OpenAI Setup
+# ----------------------
+load_dotenv()
 client = AzureOpenAI(
     api_key=os.getenv("AZURE_OPENAI_API_KEY"),
     api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
 )
+DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 
-def get_genai_recommendation(tab_name, output):
+def genai_advisory(prompt: str):
     try:
-        prompt = f"""
-        You are a utility sector advisor. Analyze the following output from {tab_name}
-        and give clear recommendations, focusing on risks, actions, and priorities.
-
-        Data:
-        {json.dumps(output, indent=2)}
-        """
-        resp = client.chat.completions.create(
-            model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
+        response = client.chat.completions.create(
+            model=DEPLOYMENT_NAME,
             messages=[
-                {"role": "system", "content": "You are a helpful assistant for energy and utilities."},
+                {"role": "system", "content": "You are a utility operations advisor."},
                 {"role": "user", "content": prompt}
-            ],
-            temperature=0.3
+            ]
         )
-        return resp.choices[0].message.content
+        return response.choices[0].message.content.strip()
     except Exception as e:
-        return f"⚠️ GenAI recommendation unavailable: {e}"
-
-def render_output(tab_name, output):
-    if tab_name == "Asset Integrity" and isinstance(output, list):
-        df = pd.DataFrame(output)
-        def color_row(row):
-            if "RUL (months)" in row:
-                if row["RUL (months)"] <= 3:
-                    return ['background-color: red'] * len(row)
-                elif row["RUL (months)"] <= 6:
-                    return ['background-color: yellow'] * len(row)
-                else:
-                    return ['background-color: lightgreen'] * len(row)
-            return [''] * len(row)
-        st.markdown("**🟩 Green = Safe | 🟨 Yellow = Nearing Replacement | 🟥 Red = Immediate Replacement Required**")
-        styled_df = df.style.apply(color_row, axis=1)
-        st.dataframe(styled_df, use_container_width=True, height=500)
-    else:
-        if isinstance(output, dict):
-            df = pd.DataFrame(list(output.items()), columns=["Metric", "Value"])
-            st.dataframe(df, use_container_width=True, height=500)
-        elif isinstance(output, list) and all(isinstance(i, dict) for i in output):
-            df = pd.DataFrame(output)
-            st.dataframe(df, use_container_width=True, height=500)
-        else:
-            st.write(output)
-
-    st.markdown("### 🤖 GenAI Recommendation")
-    recommendation = get_genai_recommendation(tab_name, output)
-    st.write(recommendation)
-
+        return f"⚠️ GenAI Error: {e}"
 
 # ----------------------
-# Orchestrator Execution
+# Table Coloring Logic
 # ----------------------
+def color_rag(row):
+    if "RUL (months)" in row:
+        if row["RUL (months)"] <= 3:
+            return ['background-color: red'] * len(row)
+        elif row["RUL (months)"] <= 6:
+            return ['background-color: yellow'] * len(row)
+    return ['background-color: lightgreen'] * len(row)
+
+# ----------------------
+# Streamlit UI
+# ----------------------
+st.set_page_config(page_title="Utility Orchestrator", layout="wide")
+st.title("⚡ Utility Orchestrator – Multi-Agent Dashboard")
+
+st.sidebar.header("Controls")
 if st.sidebar.button("▶ Run Orchestrator"):
     orch = OrchestratorAgent()
-    results = orch.run()  # <-- dict of agent outputs
+    results = orch.run()
 
-    # Map expected tab names to orchestrator keys
-    mapping = {
-        "Asset Integrity": "asset_integrity",
-        "Grid Faults": "grid_faults",
-        "Demand Forecast": "demand_forecast",
-        "Renewable Integration": "renewable_integration",
-        "Utility Energy Management": "utility_energy_mgmt",
-        "Supply Chain Optimization": "supply_chain_optimization",
-        "Field Operations": "field_operations",
-        "Energy Trading": "energy_trading"
-    }
+    tab_labels = [
+        "Asset Integrity",
+        "Grid Faults",
+        "Demand Forecast",
+        "Renewable Integration",
+        "Utility Energy Management",
+        "Supply Chain Optimization",
+        "Field Operations",
+        "Energy Trading"
+    ]
+    tabs = st.tabs(tab_labels)
 
-    tabs = st.tabs(list(mapping.keys()))
-
-    # Render each tab using the correct agent output
-    for idx, (tab_name, agent_key) in enumerate(mapping.items()):
+    for idx, (agent_name, output) in enumerate(results.items()):
         with tabs[idx]:
-            st.subheader(f"{tab_name} Output")
-            output = results.get(agent_key, {})
-            render_output(tab_name, output)
+            st.subheader(f"{tab_labels[idx]} Results")
+
+            # Convert JSON to DataFrame if possible
+            try:
+                if isinstance(output, dict):
+                    df = pd.json_normalize(output)
+                elif isinstance(output, list):
+                    df = pd.DataFrame(output)
+                else:
+                    df = pd.DataFrame([{"Result": str(output)}])
+
+                # Apply RAG coloring only if RUL present
+                if "RUL (months)" in df.columns:
+                    styled_df = df.style.apply(color_rag, axis=1)
+                    st.dataframe(styled_df, use_container_width=True, height=300)
+                else:
+                    st.dataframe(df, use_container_width=True, height=300)
+            except Exception:
+                st.json(output)
+
+            # GenAI Recommendation
+            prompt = f"Summarize insights and give a recommendation for the following {tab_labels[idx]} results:\n{json.dumps(output, indent=2)}"
+            with st.spinner("Generating GenAI recommendation..."):
+                advisory = genai_advisory(prompt)
+                st.markdown("### 🤖 GenAI Recommendation")
+                st.info(advisory)
 
 else:
     st.info("Click **▶ Run Orchestrator** in the sidebar to execute all 8 agents.")
