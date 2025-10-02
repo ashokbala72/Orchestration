@@ -29,16 +29,43 @@ if st.sidebar.button("▶ Run Orchestrator"):
     # Create tabs
     tabs = st.tabs(tab_labels)
 
-    # Helper: show output as table or chart
-    def show_output(output, tab_name):
-        # Case 1: If it's a list of dicts -> Table
-        if isinstance(output, list) and all(isinstance(i, dict) for i in output):
-            st.dataframe(pd.DataFrame(output))
+    # -------- Helper Functions --------
+    def rag_highlight(val):
+        """Highlight RAG for numeric age/condition values."""
+        try:
+            if isinstance(val, (int, float)):
+                if val > 70:
+                    return "background-color: red; color: white"
+                elif val > 40:
+                    return "background-color: orange; color: black"
+                else:
+                    return "background-color: green; color: white"
+        except:
+            return ""
+        return ""
 
-        # Case 2: Demand Forecast – plot a line chart
-        elif isinstance(output, dict) and "forecast" in output:
+    def show_output(output, tab_name):
+        # ----- Asset Integrity -----
+        if tab_name == "Asset Integrity" and isinstance(output, list):
+            df = pd.DataFrame(output)
+            if "age" in df.columns:
+                st.subheader("📋 Asset Register with Ageing Status")
+                st.dataframe(df.style.applymap(rag_highlight, subset=["age"]))
+            else:
+                st.dataframe(df)
+
+        # ----- Grid Faults -----
+        elif tab_name == "Grid Faults":
+            if isinstance(output, list):
+                st.dataframe(pd.DataFrame(output))
+            else:
+                st.json(output)
+
+        # ----- Demand Forecast -----
+        elif tab_name == "Demand Forecast" and isinstance(output, dict) and "forecast" in output:
             df = pd.DataFrame(output["forecast"])
             if not df.empty:
+                st.subheader("📈 Forecast Chart")
                 chart = alt.Chart(df).mark_line(point=True).encode(
                     x=alt.X(df.columns[0], title="Date"),
                     y=alt.Y(df.columns[1], title="Forecast"),
@@ -49,7 +76,47 @@ if st.sidebar.button("▶ Run Orchestrator"):
             else:
                 st.info("No forecast data available.")
 
-        # Case 3: Energy Trading – show buy/sell orders in table
+        # ----- Renewable Integration -----
+        elif tab_name == "Renewable Integration" and isinstance(output, dict) and "integration_plan" in output:
+            df = pd.DataFrame(output["integration_plan"])
+            st.subheader("🔋 Renewable Integration Plan")
+            st.dataframe(df)
+
+        # ----- Utility Energy Management -----
+        elif tab_name == "Utility Energy Management" and isinstance(output, dict):
+            if "dispatch_plan" in output:
+                df = pd.DataFrame(output["dispatch_plan"])
+                if not df.empty:
+                    st.subheader("⚡ Dispatch Plan")
+                    chart = alt.Chart(df).mark_bar().encode(
+                        x=df.columns[0],
+                        y=df.columns[1],
+                        tooltip=list(df.columns)
+                    )
+                    st.altair_chart(chart, use_container_width=True)
+                    st.dataframe(df)
+            else:
+                st.json(output)
+
+        # ----- Supply Chain Optimization -----
+        elif tab_name == "Supply Chain Optimization" and isinstance(output, dict):
+            if "parts_forecast" in output:
+                df = pd.DataFrame(output["parts_forecast"])
+                st.subheader("📦 Parts Forecast")
+                st.dataframe(df)
+            else:
+                st.json(output)
+
+        # ----- Field Operations -----
+        elif tab_name == "Field Operations" and isinstance(output, dict):
+            if "work_orders" in output:
+                df = pd.DataFrame(output["work_orders"])
+                st.subheader("🛠 Work Orders")
+                st.dataframe(df)
+            else:
+                st.json(output)
+
+        # ----- Energy Trading -----
         elif tab_name == "Energy Trading" and isinstance(output, dict):
             if "buy_sell_orders" in output and output["buy_sell_orders"]:
                 st.subheader("📊 Buy/Sell Orders")
@@ -61,11 +128,11 @@ if st.sidebar.button("▶ Run Orchestrator"):
                 st.subheader("⚠️ Risks")
                 st.write(output["risk_adjustments"])
 
-        # Case 4: Default fallback
+        # ----- Fallback -----
         else:
             st.json(output)
 
-    # Loop over results and display in each tab
+    # -------- Loop over agents --------
     for idx, (agent_name, output) in enumerate(results.items()):
         with tabs[idx]:
             st.subheader(f"{tab_labels[idx]} Results")
