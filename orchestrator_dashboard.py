@@ -53,16 +53,16 @@ if st.sidebar.button("▶ Run Orchestrator"):
     orch = OrchestratorAgent()
     results = orch.run()
 
-    # Explicit mapping of tabs to agent keys
+    # Correct mapping to orchestrator.py keys
     tab_mapping = {
-        "Asset Integrity": "asset_integrity",
-        "Grid Faults": "grid_faults",
-        "Demand Forecast": "demand_forecast",
-        "Renewable Integration": "renewable_integration",
-        "Utility Energy Management": "utility_energy_management",
-        "Supply Chain Optimization": "supply_chain_optimization",
-        "Field Operations": "field_operations",
-        "Energy Trading": "energy_trading"
+        "Asset Integrity": "AssetIntegrity",
+        "Grid Faults": "GridFaults",
+        "Demand Forecast": "DemandForecast",
+        "Renewable Integration": "RenewableIntegration",
+        "Utility Energy Management": "UtilityEnergyManagement",
+        "Supply Chain Optimization": "SupplyChainOptimization",
+        "Field Operations": "FieldOperations",
+        "Energy Trading": "EnergyTrading"
     }
 
     tabs = st.tabs(list(tab_mapping.keys()))
